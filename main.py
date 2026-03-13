@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 import os
+import json
 from google_auth_oauthlib.flow import Flow
 
 app = FastAPI()
@@ -84,15 +85,26 @@ async def oauth2_callback_google(request: Request):
 @app.post("/get-template-from-drive")
 async def get_template_from_drive(request: Request):
     body = await request.json()
-    document_type = body.get("document_type")
-    jurisdiction = body.get("jurisdiction")
+
+    # classifier_value is a JSON string from Airia, e.g.
+    # '{ "primary_type": "SaaS MSA", "needs_dpa": true, "jurisdiction": "US-NY" }'
+    classifier_value = body.get("classifier_value")
     category = body.get("category")
 
-    # TODO: use Drive API + tokens in TOKENS_STORE + FOLDER_ID to fetch real file
+    try:
+        data = json.loads(classifier_value) if classifier_value else {}
+    except json.JSONDecodeError:
+        data = {}
+
+    document_type = data.get("primary_type")
+    jurisdiction = data.get("jurisdiction")
+    needs_dpa = data.get("needs_dpa")
+
     # For now: dummy template so Airia integration works
     template_text = (
         f"Dummy template for {document_type} / {jurisdiction} "
-        f"with placeholders like [[COMPANY_NAME]] and [[EFFECTIVE_DATE]]."
+        f"(needs_dpa={needs_dpa}) with placeholders like "
+        f"[[COMPANY_NAME]] and [[EFFECTIVE_DATE]]."
     )
 
     return {
